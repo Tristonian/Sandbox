@@ -274,23 +274,23 @@ def review(doc_id):
                             next_pending_id=next_pending["id"] if next_pending else None)
 
 
-@app.route("/review/<int:doc_id>/approve", methods=["POST"])
-def approve(doc_id):
+def apply_review_edits(db, doc_id):
     """
-    Commits the document, applying any manual corrections made on the review
-    form (ADR-005/006: overwrite, no dual-store of the original OCR value —
+    Reads the review form and writes it to `documents` + `line_items`,
+    recomputing pass/fail from whatever's in the boxes at submit time
+    (ADR-005/006: overwrite, no dual-store of the original OCR value —
     the form field is simply pre-filled with what OCR read, and whatever the
-    human leaves in the box at submit time becomes the record).
+    human leaves in the box at submit time becomes the record). Does NOT
+    touch `status` — callers (`save`, `approve`) decide that. Returns the
+    resolved spec string.
     """
-    db = get_db()
     doc = db.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
-
     header_values = {f: request.form.get(f"field_{f}", "").strip() or None for f in HEADER_FIELDS}
     spec = header_values["spec"] or doc["spec"]
 
     db.execute(
         """UPDATE documents SET order_no=?, po_no=?, supplier=?, customer=?, commodity=?,
-           spec=?, cert_no=?, date_of_issue=?, status='approved' WHERE id=?""",
+           spec=?, cert_no=?, date_of_issue=? WHERE id=?""",
         (header_values["order_no"], header_values["po_no"], header_values["supplier"],
          header_values["customer"], header_values["commodity"], spec,
          header_values["cert_no"], header_values["date_of_issue"], doc_id),
@@ -318,6 +318,34 @@ def approve(doc_id):
     db.commit()
     # TODO(ADR-009): order_line_items join table not created yet — order_no
     # is stored directly on line_items for now as the simpler first step.
+    return spec
+
+
+@app.route("/review/<int:doc_id>/save", methods=["POST"])
+def save(doc_id):
+    """Persists edits without approving — status is left exactly as it was
+    (needs_review stays needs_review, approved stays approved). Added per
+    Tristan's request (2026-08-24): correcting a value shouldn't force you
+    through the whole approve-and-advance flow just to keep the fix."""
+    db = get_db()
+    apply_review_edits(db, doc_id)
+    return redirect(url_for("review", doc_id=doc_id))
+
+
+@app.route("/review/<int:doc_id>/approve", methods=["POST"])
+def approve(doc_id):
+    db = get_db()
+    doc = db.execute("SELECT status FROM documents WHERE id = ?", (doc_id,)).fetchone()
+    was_already_approved = doc["status"] == "approved"
+
+    apply_review_edits(db, doc_id)
+    db.execute("UPDATE documents SET status='approved' WHERE id=?", (doc_id,))
+    db.commit()
+
+    if was_already_approved:
+        # Re-editing an already-approved record — stay put rather than
+        # jumping into whatever's next in the pending queue.
+        return redirect(url_for("review", doc_id=doc_id))
 
     next_pending = db.execute(
         "SELECT id FROM documents WHERE status = 'needs_review' ORDER BY uploaded_at LIMIT 1"
@@ -329,12 +357,12 @@ def approve(doc_id):
 
 @app.route("/review/<int:doc_id>/remove", methods=["POST"])
 def remove(doc_id):
-    """Discards a document and its line items entirely — for clearing a bad
-    OCR attempt so a cleaner re-upload can take its place, not for undoing
-    an approval (approved documents are the record of truth; this only acts
-    on documents still sitting in needs_review)."""
+    """Discards a document and its line items entirely — including approved
+    ones (extended 2026-08-24 per Tristan's request; originally needs_review
+    only, see ADR-015). Used for clearing a bad OCR attempt, or a test/demo
+    record, so a cleaner version can take its place. Hard delete, no undo."""
     db = get_db()
-    doc = db.execute("SELECT * FROM documents WHERE id = ? AND status = 'needs_review'", (doc_id,)).fetchone()
+    doc = db.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
     if doc:
         crops = set(json.loads(doc["field_crops_json"] or "{}").values())
         for item in db.execute("SELECT crop_filename FROM line_items WHERE document_id = ?", (doc_id,)):
@@ -351,8 +379,11 @@ def remove(doc_id):
         db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
         db.commit()
 
-    if request.form.get("return") == "index":
+    return_to = request.form.get("return")
+    if return_to == "index":
         return redirect(url_for("index"))
+    if return_to == "data":
+        return redirect(url_for("data_table"))
 
     next_pending = db.execute(
         "SELECT id FROM documents WHERE status = 'needs_review' ORDER BY uploaded_at LIMIT 1"
@@ -366,7 +397,8 @@ def remove(doc_id):
 def data_table():
     db = get_db()
     rows = db.execute(
-        """SELECT li.*, d.original_name, d.supplier, d.customer, d.cert_no, d.spec
+        """SELECT li.*, d.id AS doc_id, d.filename AS doc_filename, d.original_name,
+                  d.supplier, d.customer, d.cert_no, d.spec
            FROM line_items li JOIN documents d ON d.id = li.document_id
            WHERE d.status = 'approved'
            ORDER BY li.id DESC"""

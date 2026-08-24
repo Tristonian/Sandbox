@@ -58,13 +58,21 @@
 <div class="panel">
   <h2 style="margin-top:0">Recently approved</h2>
   <table>
-    <tr><th>File</th><th>Cert No.</th><th>Supplier</th><th>Uploaded</th></tr>
+    <tr><th>File</th><th>Cert No.</th><th>Supplier</th><th>Uploaded</th><th colspan="2"></th></tr>
     {% for d in approved %}
     <tr>
       <td>{{ d.original_name }}</td>
       <td>{{ d.cert_no or "—" }}</td>
       <td>{{ d.supplier or "—" }}</td>
       <td>{{ d.uploaded_at }}</td>
+      <td><a class="btn secondary" href="/review/{{ d.id }}" style="padding:0.4rem 0.7rem; font-size:0.8rem;">Open</a></td>
+      <td>
+        <form method="post" action="/review/{{ d.id }}/remove" style="margin:0;"
+              onsubmit="return confirm('Discard this APPROVED document? It will be permanently deleted from the data table.');">
+          <input type="hidden" name="return" value="index">
+          <button class="btn danger" type="submit" style="padding:0.4rem 0.7rem; font-size:0.8rem;">Remove</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
   </table>

@@ -30,9 +30,16 @@ genuinely failed (Cert No. / Date of Issue came back blank — small/stamped
 text; one heat's Carbon misread as 0.2414 instead of 0.2111), not
 hypotheticals.
 
-Also built: light/dark theme toggle (`_base.html`, localStorage-persisted),
-a Remove action to discard an unreviewed document (ADR-015), and
-`README.md` with install/run instructions for Windows and macOS.
+Also built: light/dark theme toggle (`_base.html`, localStorage-persisted);
+a separate Save action distinct from Approve, for persisting a correction
+without advancing the review queue (ADR-017); live client-side pass/fail
+recolouring as you edit a value, plus a Red/Amber/Green legend on both the
+review screen and the data table; Open links from the pending list, the
+approved list, and the data table back into the full review/edit screen for
+any document regardless of status ("reviewing old stuff"); a Remove action
+that now reaches approved documents too, not just unreviewed ones (ADR-016,
+**note the audit-trail gap it flags**); and `README.md` with install/run
+instructions for Windows and macOS.
 
 **Not yet built:**
 - The `order_line_items` join table (ADR-009 — order_no is currently stored

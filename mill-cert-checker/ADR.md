@@ -10,7 +10,70 @@ deleted.
 
 ---
 
+## ADR-017 — Save and Approve split into separate actions
+
+**Context:** ADR-014 wired editing into the review form, but the only way
+to persist an edit was the same **Approve & commit** button that also
+advances to the next pending document. Tristan asked for a plain save —
+fixing a value shouldn't force a full approve-and-advance just to keep the
+correction.
+
+**Decision:** Both buttons submit the same form (all header + chemistry
+inputs) to different routes via `formaction`: **Save changes**
+(`/review/<id>/save`) persists edits and recomputes pass/fail without
+touching `status` or advancing the queue — it redirects back to the same
+document. **Approve & commit** (`/review/<id>/approve`) does the same
+persist-and-recompute, then sets `status='approved'` and advances to the
+next pending document (or index, if none). Both routes share one
+`apply_review_edits()` function so the recompute logic can't drift between
+them.
+
+**Consequences:** A document can sit in `needs_review` indefinitely with
+saved partial corrections — that's intended (matches "come back to this
+later" workflows), not a bug. Re-opening `/review/<id>/approve` for an
+already-`approved` document (via the new Open links from the data table /
+approved list, ADR-016) reuses the same route: it updates the existing
+record in place and redirects back to itself rather than jumping into the
+pending queue, since there's nothing to "advance" to.
+
+---
+
+## ADR-016 — Remove extended to approved documents
+
+**Context:** ADR-015 deliberately scoped Remove to `needs_review` documents
+only, reasoning that approved data is "the record of truth" and shouldn't
+have a casual delete path. In practice, during the same session, an
+approved test/demo document had no UI way to be removed — only a direct
+database edit could clear it — and Tristan asked for the ability to clear
+entries and re-add fresh ones without that restriction.
+
+**Decision:** `/review/<id>/remove` now deletes a document regardless of
+status, including `approved` ones. The confirmation dialog's wording
+changes based on status — approved documents get an explicit "this will be
+permanently deleted from the data table" warning, unreviewed ones get the
+original wording. Remove is now reachable from three places: the review
+screen, the pending list (upload page), and the approved list (both on the
+upload page and in the full data table) — each pointing back to a sensible
+place afterward via a `return` form field (`index`, `data`, or the default
+next-pending-document behaviour).
+
+**Consequences:** This reverses ADR-015's core safety argument — there is
+now no protected category of data in this tool; anything can be hard-deleted
+by anyone with access to the running app, with only a browser `confirm()`
+dialog in the way. Acceptable for a single-user/small-team local prototype
+with no auth, which is the only context this has been built for so far.
+**Explicitly revisit before this tool has multiple users or any real
+audit/compliance weight** — at that point "who deleted an approved
+certificate record and why" needs to be answerable, which nothing here
+currently provides (no soft-delete, no deletion log).
+
+---
+
 ## ADR-015 — Remove/discard is scoped to unreviewed documents only
+
+**Superseded by ADR-016** — kept for history; the "approved documents can't
+be removed" restriction described below no longer holds.
+
 
 **Context:** Tristan asked for a way to clear a bad OCR attempt and
 re-upload cleanly, for demo purposes and general workflow — uploading a

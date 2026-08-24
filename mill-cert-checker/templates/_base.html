@@ -63,6 +63,12 @@
   .crop-compare { display: flex; align-items: flex-start; gap: 1rem; background: color-mix(in srgb, var(--muted) 6%, var(--panel)); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; margin: 0.35rem 0 0.75rem; }
   .crop-compare img { max-width: 420px; max-height: 90px; border: 1px solid var(--border); border-radius: 4px; background: white; }
   .crop-compare .crop-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.25rem; }
+  .legend { display: flex; gap: 1.25rem; align-items: center; font-size: 0.82rem; color: var(--muted); margin-bottom: 1rem; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+  .legend-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; display: inline-block; }
+  .legend-dot.pass { background: var(--pass); }
+  .legend-dot.fail { background: var(--fail); }
+  .legend-dot.review { background: var(--review); }
 </style>
 </head>
 <body>

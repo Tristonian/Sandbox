@@ -1,7 +1,14 @@
 {% extends "_base.html" %}
 {% block content %}
 
-<p><a class="todo" href="/">← back to upload</a></p>
+<p><a class="todo" href="/">← back to upload</a> · <a class="todo" href="/data">data table →</a></p>
+
+{% if doc.status == 'approved' %}
+<div class="callout">
+  This document is already <strong>approved</strong> — you're viewing/editing the committed
+  record. Saving or approving again updates it in place; it won't be queued back into pending review.
+</div>
+{% endif %}
 
 {% if dup %}
 <div class="callout warn">
@@ -20,14 +27,14 @@
 </div>
 {% endif %}
 
-<form method="post" action="/review/{{ doc.id }}/approve">
+<form id="review-form" method="post" action="/review/{{ doc.id }}/approve">
 <div class="panel">
   <div style="display:flex; justify-content:space-between; align-items:flex-start;">
     <h2 style="margin-top:0">{{ doc.original_name }} <span class="badge {{ doc.extraction_mode }}">{{ doc.extraction_mode }}</span></h2>
-    <a class="btn secondary" href="/uploads/{{ doc.filename }}" target="_blank">View full source file</a>
+    <a class="btn secondary" href="/uploads/{{ doc.filename }}" target="_blank">Open full source file</a>
   </div>
-  <p class="todo">Fields are editable — correct anything OCR got wrong before approving. Where
-    available, the exact source-image region is shown alongside for a quick by-eye check.</p>
+  <p class="todo">Fields are editable — correct anything OCR got wrong. Where available, the exact
+    source-image region is shown alongside for a quick by-eye check.</p>
 
   {% for f, label in [("order_no","Order No."), ("po_no","PO No."), ("supplier","Supplier"),
                        ("customer","Customer"), ("commodity","Commodity"), ("spec","Spec"),
@@ -51,15 +58,24 @@
 
 <div class="panel">
   <h2 style="margin-top:0">Line items — chemical composition vs {{ doc.spec }}</h2>
+
+  <div class="legend">
+    <strong style="color:var(--text)">Key:</strong>
+    <span class="legend-item"><span class="legend-dot pass"></span>Pass — within the confirmed spec range</span>
+    <span class="legend-item"><span class="legend-dot fail"></span>Fail — outside the spec range</span>
+    <span class="legend-item"><span class="legend-dot review"></span>Needs review — no confirmed tolerance on file for this element (ADR-002)</span>
+  </div>
+
   <p class="todo">
-    Pass/fail per ADR-002: green = within the confirmed spec range, red = out of range,
-    amber = no confirmed tolerance on file for this element. Edit any value and re-approve —
-    pass/fail recomputes from what's in the boxes at submit time.
+    Edit any value below — the colour updates immediately as you type (checked client-side against
+    the same limits used server-side). Hit <strong>Save changes</strong> to persist without leaving
+    this document, or <strong>Approve &amp; commit</strong> to save and move to the next one pending.
   </p>
+
   {% for item in items %}
   <h3 style="margin-bottom:0.25rem;">
     Heat <input type="text" name="heat_{{ item.id }}" value="{{ item.heat_no or '' }}" style="width:9em; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:0.15rem 0.4rem; font-size:0.95rem;">
-    <span class="status-{{ item.overall_status }}">
+    <span id="badge-{{ item.id }}" class="status-{{ item.overall_status }}">
       {% if item.overall_status == 'pass' %}✓ PASS{% elif item.overall_status == 'fail' %}✗ FAIL{% else %}⚑ NEEDS REVIEW{% endif %}
     </span>
   </h3>
@@ -82,7 +98,11 @@
     </tr>
     <tr>
       {% for el, r in item.results.items() %}
-      <td class="status-{{ r.status }}" title="{% if r.min is not none or r.max is not none %}spec: {{ r.min if r.min is not none else '' }}–{{ r.max if r.max is not none else '' }}{% else %}no confirmed limit on file{% endif %}">
+      <td class="chem-cell status-{{ r.status }}" data-item="{{ item.id }}"
+          data-has-limit="{{ '1' if (r.min is not none or r.max is not none) else '0' }}"
+          data-min="{{ r.min if r.min is not none else '' }}"
+          data-max="{{ r.max if r.max is not none else '' }}"
+          title="{% if r.min is not none or r.max is not none %}spec: {{ r.min if r.min is not none else '' }}–{{ r.max if r.max is not none else '' }}{% else %}no confirmed limit on file{% endif %}">
         <input type="text" name="chem_{{ item.id }}_{{ el }}" value="{{ r.value }}" style="width:5.5em; background:transparent; color:inherit; border:1px solid var(--border); border-radius:4px; padding:0.15rem 0.3rem; font-size:0.85rem; font-weight:600;">
       </td>
       {% endfor %}
@@ -94,16 +114,55 @@
   {% endfor %}
 </div>
 
-<button class="btn" type="submit">Approve &amp; commit this document</button>
-{% if next_pending_id %}
+<button class="btn secondary" type="submit" formaction="/review/{{ doc.id }}/save">Save changes</button>
+<button class="btn" type="submit" formaction="/review/{{ doc.id }}/approve">
+  {{ "Save (already approved)" if doc.status == 'approved' else "Approve & commit this document" }}
+</button>
+{% if next_pending_id and doc.status != 'approved' %}
 <span class="todo">→ next pending document follows automatically</span>
 {% endif %}
 </form>
 
 <form method="post" action="/review/{{ doc.id }}/remove" style="margin-top:0.75rem;"
-      onsubmit="return confirm('Discard this document and its extracted line items? This cannot be undone.');">
+      onsubmit="return confirm({{ ('Discard this APPROVED document? It will be permanently deleted from the data table. This cannot be undone.' if doc.status == 'approved' else 'Discard this document and its extracted line items? This cannot be undone.')|tojson }});">
   <button class="btn danger" type="submit">Remove this document</button>
-  <span class="todo">discards it entirely — use this to clear a bad OCR attempt and re-upload fresh</span>
+  <span class="todo">discards it entirely{{ " — including its approved data" if doc.status == 'approved' else "" }}</span>
 </form>
+
+<script>
+  function updateItemStatus(itemId) {
+    var cells = document.querySelectorAll('.chem-cell[data-item="' + itemId + '"]');
+    var overall = 'pass', anyReview = false;
+    cells.forEach(function (td) {
+      var input = td.querySelector('input');
+      var hasLimit = td.dataset.hasLimit === '1';
+      var min = td.dataset.min !== '' ? parseFloat(td.dataset.min) : null;
+      var max = td.dataset.max !== '' ? parseFloat(td.dataset.max) : null;
+      var val = parseFloat(input.value);
+      var cls;
+      if (!hasLimit || isNaN(val)) {
+        cls = 'status-review'; anyReview = true;
+      } else {
+        var ok = (min === null || val >= min) && (max === null || val <= max);
+        cls = ok ? 'status-pass' : 'status-fail';
+        if (!ok) overall = 'fail';
+      }
+      td.classList.remove('status-pass', 'status-fail', 'status-review');
+      td.classList.add(cls);
+    });
+    if (overall !== 'fail' && anyReview) overall = 'review';
+    var badge = document.getElementById('badge-' + itemId);
+    if (badge) {
+      badge.classList.remove('status-pass', 'status-fail', 'status-review');
+      badge.classList.add('status-' + overall);
+      badge.textContent = overall === 'pass' ? '✓ PASS' : overall === 'fail' ? '✗ FAIL' : '⚑ NEEDS REVIEW';
+    }
+  }
+  document.querySelectorAll('.chem-cell input').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      updateItemStatus(inp.closest('.chem-cell').dataset.item);
+    });
+  });
+</script>
 
 {% endblock %}

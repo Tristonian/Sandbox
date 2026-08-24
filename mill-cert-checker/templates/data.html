@@ -11,13 +11,22 @@
     built yet — this is the flat view proving the core pipeline first.</span>
   </p>
 
+  {% if rows %}
+  <div class="legend">
+    <strong style="color:var(--text)">Key:</strong>
+    <span class="legend-item"><span class="legend-dot pass"></span>Pass</span>
+    <span class="legend-item"><span class="legend-dot fail"></span>Fail</span>
+    <span class="legend-item"><span class="legend-dot review"></span>Needs review — no confirmed tolerance on file</span>
+  </div>
+  {% endif %}
+
   {% if not rows %}
   <p style="color: var(--muted)">Nothing approved yet — upload and approve a document first.</p>
   {% else %}
   <table>
     <tr>
       <th>Cert No.</th><th>Supplier</th><th>Customer</th><th>Spec</th>
-      <th>Heat No.</th><th>Order No.</th><th>Result</th>
+      <th>Heat No.</th><th>Order No.</th><th>Result</th><th colspan="2"></th>
     </tr>
     {% for r in rows %}
     <tr>
@@ -29,6 +38,14 @@
       <td>{{ r.order_no or "—" }}</td>
       <td class="status-{{ r.overall_status }}">
         {% if r.overall_status == 'pass' %}✓ PASS{% elif r.overall_status == 'fail' %}✗ FAIL{% else %}⚑ REVIEW{% endif %}
+      </td>
+      <td><a class="btn secondary" href="/review/{{ r.doc_id }}" style="padding:0.4rem 0.7rem; font-size:0.8rem;">Open</a></td>
+      <td>
+        <form method="post" action="/review/{{ r.doc_id }}/remove" style="margin:0;"
+              onsubmit="return confirm('Discard this APPROVED document (all its heats) permanently?');">
+          <input type="hidden" name="return" value="data">
+          <button class="btn danger" type="submit" style="padding:0.4rem 0.7rem; font-size:0.8rem;">Remove</button>
+        </form>
       </td>
     </tr>
     {% endfor %}
