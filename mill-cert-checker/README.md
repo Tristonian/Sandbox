@@ -5,8 +5,10 @@ the header info and per-heat chemical composition table, checks each
 element against a tolerance spec (starting with SAE10B21), and — after a
 human reviews and corrects the extraction — commits it to a local database.
 
-Full design reasoning lives in [`ADR.md`](ADR.md) and current status/open
-items in [`NEXT-STEPS.md`](NEXT-STEPS.md). This file is just "how to run it."
+Full design reasoning lives in [`ADR.md`](ADR.md), current status/open
+items in [`NEXT-STEPS.md`](NEXT-STEPS.md), and guidance for anyone (human
+or AI) picking this project back up in [`CLAUDE.md`](CLAUDE.md). This file
+is just "how to run it."
 
 ## Prerequisites
 
@@ -75,10 +77,19 @@ machine.
 2. You'll land on the review screen for the first one: extracted fields are
    editable, with the exact source-image region shown next to each so you
    can eyeball-check it against what OCR read, no need to open the original
-   file separately.
-3. Fix anything OCR got wrong, then **Approve & commit**. Or **Remove** to
-   discard a bad extraction and re-upload a cleaner one.
-4. Approved data shows up in the **Data table** page.
+   file separately. Chemistry cells recolor live (green/amber/red — see the
+   key on the page) as you edit a value.
+3. **Save changes** persists corrections without leaving the document.
+   **Approve & commit** persists and moves you to the next one pending.
+   **Remove** discards this document entirely (including its extracted
+   data) so you can re-upload a cleaner version.
+4. Approved data shows up in the **Data table** page. Every document —
+   pending or already approved — has an **Open** link back into the review
+   screen from the upload page or the data table, so you can revisit an old
+   cert, re-check its source crops, or **Remove** it later if it turns out
+   to be wrong. Removing an approved document is permanent — there's no undo
+   and no log of who removed what (see `CLAUDE.md` for why that's a known
+   gap, not an oversight).
 
 ## Troubleshooting
 
