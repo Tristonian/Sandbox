@@ -1,0 +1,96 @@
+{% extends "_base.html" %}
+{% block content %}
+
+{% if ocr_available %}
+<div class="callout">
+  <strong>Extraction runs on local Tesseract OCR</strong> — free, offline, no API billing (ADR-012).
+  <span class="todo">Header-field and table parsing use pattern-matching on the OCR'd text, not true
+  layout understanding — expect some fields (especially small/stamped text) to come back blank or
+  wrong on messier scans. That's exactly what the review screen below is for.</span>
+</div>
+{% else %}
+<div class="callout warn">
+  <strong>Tesseract not found</strong> — uploads will fall back to placeholder mock data so the
+  pipeline still runs end to end. Install Tesseract OCR and restart the app to enable real extraction.
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2 style="margin-top:0">Upload certificate(s)</h2>
+  <p class="todo">Drop one or more files. Each file is treated as its own certificate (ADR-007) —
+    you'll review them one at a time.</p>
+  <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+    <div id="dropzone" style="border: 2px dashed #2a2f38; border-radius: 8px; padding: 3rem 1rem; text-align: center; cursor: pointer; transition: border-color .15s;">
+      <div style="font-size: 2rem;">📄</div>
+      <p style="margin: 0.5rem 0 0; color: var(--muted);">Drag PDF/image files here, or click to browse</p>
+      <input id="file-input" type="file" name="files" multiple accept=".pdf,.png,.jpg,.jpeg" style="display:none">
+    </div>
+  </form>
+</div>
+
+{% if pending %}
+<div class="panel">
+  <h2 style="margin-top:0">Awaiting review ({{ pending|length }})</h2>
+  <table>
+    <tr><th>File</th><th>Cert No.</th><th>Supplier</th><th>Uploaded</th><th>Mode</th><th colspan="2"></th></tr>
+    {% for d in pending %}
+    <tr>
+      <td>{{ d.original_name }}</td>
+      <td>{{ d.cert_no or "—" }}</td>
+      <td>{{ d.supplier or "—" }}</td>
+      <td>{{ d.uploaded_at }}</td>
+      <td><span class="badge {{ d.extraction_mode }}">{{ d.extraction_mode }}</span></td>
+      <td><a class="btn secondary" href="/review/{{ d.id }}">Review</a></td>
+      <td>
+        <form method="post" action="/review/{{ d.id }}/remove" style="margin:0;"
+              onsubmit="return confirm('Discard this document and its extracted line items?');">
+          <input type="hidden" name="return" value="index">
+          <button class="btn danger" type="submit" style="padding:0.4rem 0.7rem; font-size:0.8rem;">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if approved %}
+<div class="panel">
+  <h2 style="margin-top:0">Recently approved</h2>
+  <table>
+    <tr><th>File</th><th>Cert No.</th><th>Supplier</th><th>Uploaded</th></tr>
+    {% for d in approved %}
+    <tr>
+      <td>{{ d.original_name }}</td>
+      <td>{{ d.cert_no or "—" }}</td>
+      <td>{{ d.supplier or "—" }}</td>
+      <td>{{ d.uploaded_at }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <a class="todo" href="/data">→ view full data table</a>
+</div>
+{% endif %}
+
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const input = document.getElementById('file-input');
+  const form = document.getElementById('upload-form');
+
+  dropzone.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => { if (input.files.length) form.submit(); });
+
+  ['dragover', 'dragenter'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.style.borderColor = '#5b8def'; }));
+  ['dragleave', 'dragend'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { dropzone.style.borderColor = '#2a2f38'; }));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.style.borderColor = '#2a2f38';
+    if (e.dataTransfer.files.length) {
+      input.files = e.dataTransfer.files;
+      form.submit();
+    }
+  });
+</script>
+{% endblock %}

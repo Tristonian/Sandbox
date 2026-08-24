@@ -1,0 +1,5 @@
+.env
+uploads/
+millcert.db
+__pycache__/
+*.pyc

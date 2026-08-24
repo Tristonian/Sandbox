@@ -1,0 +1,109 @@
+{% extends "_base.html" %}
+{% block content %}
+
+<p><a class="todo" href="/">← back to upload</a></p>
+
+{% if dup %}
+<div class="callout warn">
+  ⚠️ <strong>Cert No. {{ doc.cert_no }} already exists</strong> (approved, doc #{{ dup.id }},
+  {{ dup.uploaded_at }}). Per ADR-008 this is allowed — a cert can legitimately back more than one
+  order — but confirm this isn't an accidental re-upload before approving.
+</div>
+{% endif %}
+
+{% if doc.extraction_mode == 'ocr' and (not doc.cert_no or not doc.date_of_issue) %}
+<div class="callout warn">
+  ⚠️ OCR couldn't read {{ "Certificate No. and Date of Issue" if not doc.cert_no and not doc.date_of_issue
+    else ("Certificate No." if not doc.cert_no else "Date of Issue") }} on this document — often
+  small/stamped text. Fill it in below before approving, or
+  <a href="/uploads/{{ doc.filename }}" target="_blank">open the source file</a> to check it.
+</div>
+{% endif %}
+
+<form method="post" action="/review/{{ doc.id }}/approve">
+<div class="panel">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <h2 style="margin-top:0">{{ doc.original_name }} <span class="badge {{ doc.extraction_mode }}">{{ doc.extraction_mode }}</span></h2>
+    <a class="btn secondary" href="/uploads/{{ doc.filename }}" target="_blank">View full source file</a>
+  </div>
+  <p class="todo">Fields are editable — correct anything OCR got wrong before approving. Where
+    available, the exact source-image region is shown alongside for a quick by-eye check.</p>
+
+  {% for f, label in [("order_no","Order No."), ("po_no","PO No."), ("supplier","Supplier"),
+                       ("customer","Customer"), ("commodity","Commodity"), ("spec","Spec"),
+                       ("cert_no","Certificate No."), ("date_of_issue","Date of Issue")] %}
+  <div style="margin-bottom:0.6rem;">
+    <label style="display:block; color:var(--muted); font-size:0.78rem; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.2rem;">{{ label }}</label>
+    {% if field_crops.get(f) %}
+    <div class="crop-compare">
+      <div>
+        <div class="crop-label">source</div>
+        <img src="/uploads/crops/{{ field_crops[f] }}" alt="source crop for {{ label }}">
+      </div>
+      <input type="text" name="field_{{ f }}" value="{{ doc[f] or '' }}" style="flex:1; align-self:center; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.5rem 0.6rem; font-size:0.9rem;">
+    </div>
+    {% else %}
+    <input type="text" name="field_{{ f }}" value="{{ doc[f] or '' }}" placeholder="not extracted — enter manually" style="width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.5rem 0.6rem; font-size:0.9rem;">
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Line items — chemical composition vs {{ doc.spec }}</h2>
+  <p class="todo">
+    Pass/fail per ADR-002: green = within the confirmed spec range, red = out of range,
+    amber = no confirmed tolerance on file for this element. Edit any value and re-approve —
+    pass/fail recomputes from what's in the boxes at submit time.
+  </p>
+  {% for item in items %}
+  <h3 style="margin-bottom:0.25rem;">
+    Heat <input type="text" name="heat_{{ item.id }}" value="{{ item.heat_no or '' }}" style="width:9em; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:0.15rem 0.4rem; font-size:0.95rem;">
+    <span class="status-{{ item.overall_status }}">
+      {% if item.overall_status == 'pass' %}✓ PASS{% elif item.overall_status == 'fail' %}✗ FAIL{% else %}⚑ NEEDS REVIEW{% endif %}
+    </span>
+  </h3>
+  <p class="todo" style="margin-top:0;">
+    product {{ item.product_no or "—" }}
+  </p>
+
+  {% if item.crop_filename %}
+  <div class="crop-compare">
+    <div>
+      <div class="crop-label">source row</div>
+      <img src="/uploads/crops/{{ item.crop_filename }}" alt="source crop for heat {{ item.heat_no }}">
+    </div>
+  </div>
+  {% endif %}
+
+  <table>
+    <tr>
+      {% for el in item.results.keys() %}<th>{{ el }}</th>{% endfor %}
+    </tr>
+    <tr>
+      {% for el, r in item.results.items() %}
+      <td class="status-{{ r.status }}" title="{% if r.min is not none or r.max is not none %}spec: {{ r.min if r.min is not none else '' }}–{{ r.max if r.max is not none else '' }}{% else %}no confirmed limit on file{% endif %}">
+        <input type="text" name="chem_{{ item.id }}_{{ el }}" value="{{ r.value }}" style="width:5.5em; background:transparent; color:inherit; border:1px solid var(--border); border-radius:4px; padding:0.15rem 0.3rem; font-size:0.85rem; font-weight:600;">
+      </td>
+      {% endfor %}
+    </tr>
+  </table>
+  {% if item.raw_ocr_line %}
+  <p class="todo" style="margin-top:-0.25rem;">raw OCR line: <code>{{ item.raw_ocr_line }}</code></p>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<button class="btn" type="submit">Approve &amp; commit this document</button>
+{% if next_pending_id %}
+<span class="todo">→ next pending document follows automatically</span>
+{% endif %}
+</form>
+
+<form method="post" action="/review/{{ doc.id }}/remove" style="margin-top:0.75rem;"
+      onsubmit="return confirm('Discard this document and its extracted line items? This cannot be undone.');">
+  <button class="btn danger" type="submit">Remove this document</button>
+  <span class="todo">discards it entirely — use this to clear a bad OCR attempt and re-upload fresh</span>
+</form>
+
+{% endblock %}

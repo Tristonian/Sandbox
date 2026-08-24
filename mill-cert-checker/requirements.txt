@@ -1,0 +1,8 @@
+flask
+pymupdf
+pillow
+pytesseract
+# anthropic  # optional — only needed if a cloud vision fallback is added later (ADR-012)
+
+# Also requires the Tesseract OCR system binary (not pip-installable):
+# winget install --id UB-Mannheim.TesseractOCR -e

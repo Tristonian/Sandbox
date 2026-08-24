@@ -1,0 +1,39 @@
+{% extends "_base.html" %}
+{% block content %}
+
+<p><a class="todo" href="/">← back to upload</a></p>
+
+<div class="panel">
+  <h2 style="margin-top:0">Approved data table</h2>
+  <p class="todo">
+    One row per heat/line-item from approved certificates. <span class="todo">Order↔line-item
+    linking (ADR-009), spec_limits edit history (ADR-010) and API usage logging (ADR-011) aren't
+    built yet — this is the flat view proving the core pipeline first.</span>
+  </p>
+
+  {% if not rows %}
+  <p style="color: var(--muted)">Nothing approved yet — upload and approve a document first.</p>
+  {% else %}
+  <table>
+    <tr>
+      <th>Cert No.</th><th>Supplier</th><th>Customer</th><th>Spec</th>
+      <th>Heat No.</th><th>Order No.</th><th>Result</th>
+    </tr>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.cert_no or "—" }}</td>
+      <td>{{ r.supplier or "—" }}</td>
+      <td>{{ r.customer or "—" }}</td>
+      <td>{{ r.spec or "—" }}</td>
+      <td>{{ r.heat_no or "—" }}</td>
+      <td>{{ r.order_no or "—" }}</td>
+      <td class="status-{{ r.overall_status }}">
+        {% if r.overall_status == 'pass' %}✓ PASS{% elif r.overall_status == 'fail' %}✗ FAIL{% else %}⚑ REVIEW{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('millcert-theme');
+      var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+</script>
+<title>{% block title %}Mill Cert Checker{% endblock %}</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --border: #dbdfe6; --text: #1a1d23;
+    --muted: #656d7a; --accent: #3b66d6; --pass: #1b8a3d; --fail: #c53a2f;
+    --review: #a9750a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1216; --panel: #171b21; --border: #2a2f38; --text: #e6e9ef;
+    --muted: #8b93a1; --accent: #5b8def; --pass: #2ea043; --fail: #d9534f;
+    --review: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: -apple-system, Segoe UI, Arial, sans-serif;
+    margin: 0; padding: 0 0 3rem;
+  }
+  header {
+    padding: 1.25rem 2rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 1.1rem; margin: 0; }
+  header nav { display: flex; align-items: center; }
+  header nav a { color: var(--muted); text-decoration: none; margin-left: 1.5rem; font-size: 0.9rem; }
+  header nav a:hover { color: var(--text); }
+  #theme-toggle {
+    margin-left: 1.5rem; background: none; border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 0.3rem 0.55rem; cursor: pointer; font-size: 0.95rem; line-height: 1;
+  }
+  main { max-width: 1100px; margin: 2rem auto; padding: 0 2rem; }
+  .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .badge.mock { background: color-mix(in srgb, var(--review) 20%, var(--panel)); color: var(--review); }
+  .badge.ocr, .badge.live { background: color-mix(in srgb, var(--pass) 20%, var(--panel)); color: var(--pass); }
+  .status-pass { color: var(--pass); font-weight: 600; }
+  .status-fail { color: var(--fail); font-weight: 600; }
+  .status-review { color: var(--review); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th, td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); text-align: left; font-size: 0.88rem; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+  .callout { border-left: 3px solid var(--accent); padding: 0.6rem 1rem; background: color-mix(in srgb, var(--accent) 8%, var(--panel)); font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; border-radius: 0 6px 6px 0; }
+  .callout.warn { border-left-color: var(--review); background: color-mix(in srgb, var(--review) 10%, var(--panel)); }
+  .btn { display: inline-block; background: var(--accent); color: white; border: none; padding: 0.55rem 1.1rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer; text-decoration: none; }
+  .btn:hover { opacity: 0.9; }
+  .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn.danger { background: transparent; border: 1px solid var(--fail); color: var(--fail); }
+  .btn.danger:hover { background: color-mix(in srgb, var(--fail) 12%, var(--panel)); opacity: 1; }
+  .todo { color: var(--muted); font-style: italic; font-size: 0.8rem; }
+  code { background: color-mix(in srgb, var(--muted) 15%, var(--panel)); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+  .crop-compare { display: flex; align-items: flex-start; gap: 1rem; background: color-mix(in srgb, var(--muted) 6%, var(--panel)); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; margin: 0.35rem 0 0.75rem; }
+  .crop-compare img { max-width: 420px; max-height: 90px; border: 1px solid var(--border); border-radius: 4px; background: white; }
+  .crop-compare .crop-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.25rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔬 Mill Cert Checker <span class="todo">prototype</span></h1>
+  <nav>
+    <a href="/">Upload</a>
+    <a href="/data">Data table</a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark">🌓</button>
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+<script>
+  document.getElementById('theme-toggle').addEventListener('click', function () {
+    var root = document.documentElement;
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('millcert-theme', next); } catch (e) {}
+  });
+</script>
+</body>
+</html>
